@@ -1,20 +1,20 @@
 # VisionGuard: AI-Powered Driver Monitoring System
 
-**VisionGuard** is a real-time Computer Vision solution designed to enhance road safety by monitoring driver attentiveness. It uses advanced facial landmark analysis to detect signs of drowsiness, distraction, and fatigue.
+**VisionGuard** is a real-time Computer Vision solution designed to enhance road safety by monitoring driver attentiveness. It uses advanced Machine Learning models to detect signs of drowsiness, physical distraction (phone usage), and emotional state.
 
 ![VisionGuard Demo](visionguard_demo.png)
 
 ## 🚀 Features
-- **Real-time Drowsiness Detection**: Monitors Eye Aspect Ratio (EAR) and alerts the driver after sustained eye closure.
-- **Yawn Detection**: Analyzes Mouth Aspect Ratio (MAR) to detect physical signs of fatigue.
-- **Distraction Monitoring**: Estimates head pose (Yaw and Pitch) to ensure the driver is looking at the road.
-- **Aesthetic Overlay**: Professional, high-contrast visual indicators for live feedback.
-- **Interactive Dashboard**: A Streamlit interface for easy demonstration and technical insights.
+- **Real-time Drowsiness Detection**: Evaluates Eye Aspect Ratio (EAR) using MediaPipe's facial landmarks and alerts the driver after sustained eye closure.
+- **Phone Distraction Monitoring**: Utilizes Ultralytics YOLOv8 object detection to identify if the driver is actively looking at or holding a cell phone.
+- **Emotional Telemetry**: DeepFace monitors the driver's general disposition (Stress, Anger, Focus) to contextualize the safety threat.
+- **Weighted Risk Engine**: Combines all AI telemetry into a single, comprehensive `risk_score` (LOW, MEDIUM, HIGH) which tracks danger probabilistically.
+- **Interactive Dashboard**: A massive Streamlit interface displaying real-time FPS, bounded-box webcam video, and live alert telemetry dynamically.
 
 ## 🛠️ Tech Stack
-- **Language**: Python 3.9+
+- **Languages**: Python 3.11+
 - **Computer Vision**: OpenCV, MediaPipe (Face Mesh)
-- **Math & Logic**: NumPy, SciPy
+- **Object Detection & Emotion**: YOLOv8 (Ultralytics), DeepFace, Keras
 - **UI Framework**: Streamlit
 
 ## 📦 Installation & Setup
@@ -26,6 +26,7 @@
    ```
 
 2. **Install Dependencies**
+   (Note: Due to DeepFace, PyTorch, and TensorFlow, this installation is large).
    ```bash
    pip install -r requirements.txt
    ```
@@ -35,16 +36,14 @@
    streamlit run app.py
    ```
 
-4. **Launch Live Demo Directly**
-   ```bash
-   python vision_guard.py
-   ```
+4. **Launch the Real-Time Stream**
+   - Head to `http://localhost:8501` in your browser.
+   - Click **Start System** on the sidebar to initialize the AI inference models.
 
-## 📐 How it Works
-1. **Face Mesh**: MediaPipe extracts 468 facial landmarks in 3D.
-2. **EAR calculation**: Computes the ratio between the vertical and horizontal Eye distance.
-3. **MAR calculation**: Computes the ratio of the inner mouth opening.
-4. **SolvePnP**: Estimates head orientation (Yaw, Pitch, Roll) using a 3D generic facial model.
+## 📐 Application Architecture
+1. **Face Mesh**: Extracts 468 facial landmarks in 3D for perfect EAR ratio calculations.
+2. **YOLO Inference**: Processes BGR frames locally to flag the "cell phone" object class seamlessly during the recording loop.
+3. **Session State Loop**: `st.empty().image()` prevents the web socket from reloading the application thread and locking up the Deep Learning algorithms.
 
 ## 📄 License
-MIT License - Feel free to use and improve for road safety research!
+MIT License - Developed as a Capstone BYOP Project for VITyarthi.
