@@ -1,78 +1,146 @@
 import streamlit as st
 import cv2
-import PIL.Image as Image
+import time
 import numpy as np
-from vision_guard import run_vision_guard
 
-st.set_page_config(page_title="VisionGuard AI", page_icon="🚗", layout="wide")
+# Import the refactored modules
+import config
+from detectors import EyeDetector, PhoneDetector, EmotionDetector
+from core import RiskEngine, AlertSystem
+from annotator import annotate
 
-# Custom CSS for Premium Look
-st.markdown("""
-    <style>
-    .main {
-        background-color: #0e1117;
-        color: #ffffff;
-    }
-    .stButton>button {
-        background-color: #ff4b4b;
-        color: white;
-        border-radius: 10px;
-        height: 3em;
-        width: 100%;
-        font-weight: bold;
-    }
-    .metric-card {
-        background-color: #161b22;
-        padding: 20px;
-        border-radius: 15px;
-        border: 1px solid #30363d;
-        text-align: center;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+st.set_page_config(page_title="Driver Safety Monitor", page_icon="🛡️", layout="wide")
 
-st.title("🚗 VisionGuard: AI-Powered Driver Monitoring System")
-st.markdown("---")
+st.title("🛡️ Driver Safety Monitoring System")
+st.markdown("Real-time monitoring for **Drowsiness**, **Phone Distraction**, and **Emotional state**.")
 
-col1, col2 = st.columns([1, 2])
+# ── Sidebar Configuration ──
+st.sidebar.header("Configuration")
+camera_index = st.sidebar.number_input("Camera Index", min_value=0, value=0, step=1)
 
+if 'run_camera' not in st.session_state:
+    st.session_state.run_camera = False
+
+def start_camera():
+    st.session_state.run_camera = True
+
+def stop_camera():
+    st.session_state.run_camera = False
+
+col1, col2 = st.sidebar.columns(2)
 with col1:
-    st.header("Project Overview")
-    st.write("""
-    VisionGuard is a real-time computer vision system designed to prevent accidents caused by driver fatigue and distraction. 
-    It uses MediaPipe Face Mesh to analyze facial landmarks and detect:
-    - **Drowsiness**: Prolonged eye closure (EAR).
-    - **Yawning**: Signs of physical fatigue (MAR).
-    - **Distraction**: Looking away from the road (Head Pose).
-    """)
-    
-    st.subheader("Key Metrics")
-    st.markdown("""
-    - **EAR (Eye Aspect Ratio)**: < 0.23 indicates closed eyes.
-    - **MAR (Mouth Aspect Ratio)**: > 0.6 indicates yawning.
-    - **Yaw/Pitch**: Measures head rotation relative to the camera.
-    """)
-
-    if st.button("🚀 Launch Live Demo"):
-        st.info("Live Demo launching in a separate window. Press 'ESC' to close.")
-        run_vision_guard()
-
+    st.button("Start System", on_click=start_camera, use_container_width=True, type="primary")
 with col2:
-    st.header("Technical Explanation")
-    
-    tabs = st.tabs(["Eye Aspect Ratio", "Mouth Aspect Ratio", "Head Pose"])
-    
-    with tabs[0]:
-        st.image("https://user-images.githubusercontent.com/38150419/54070054-d84a7e80-424a-11e9-864b-76f57356263b.png", caption="EAR Calculation Logic")
-        st.code("""
-        EAR = (|p2-p6| + |p3-p5|) / (2 * |p1-p4|)
-        """, language="python")
+    st.button("Stop System", on_click=stop_camera, use_container_width=True)
 
-    with tabs[1]:
-        st.write("MAR detects the opening of the mouth. If the value exceeds a threshold for a sustained period, a 'Yawning' alert is triggered.")
+# ── Dashboard Layout ──
+video_col, stats_col = st.columns([2, 1])
+
+with video_col:
+    st.markdown("### Live Feed")
+    frame_placeholder = st.empty()
+
+with stats_col:
+    st.markdown("### System Telemetry")
+    risk_metric = st.empty()
+    score_metric = st.empty()
+    fps_metric = st.empty()
+    
+    st.markdown("### Detections")
+    emotion_metric = st.empty()
+    phone_metric = st.empty()
+    drowsy_metric = st.empty()
+
+    st.markdown("### Alerts")
+    alert_box = st.empty()
+
+# ── Camera Loop ──
+if st.session_state.run_camera:
+    cap = cv2.VideoCapture(camera_index)
+    if not cap.isOpened():
+        st.error(f"Cannot open camera {camera_index}. Please check connection.")
+        st.session_state.run_camera = False
+        st.rerun()
+
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, config.FRAME_WIDTH)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.FRAME_HEIGHT)
+
+    # Initialize modules
+    eye_det = EyeDetector()
+    phone_det = PhoneDetector()
+    emo_det = EmotionDetector()
+    risk_eng = RiskEngine()
+    alert_sys = AlertSystem()
+
+    fps_counter = 0
+    fps_timer = time.time()
+    fps = 0.0
+    
+    recent_alerts = []
+
+    while st.session_state.run_camera:
+        ret, frame_bgr = cap.read()
+        if not ret:
+            st.error("Frame read failed.")
+            break
+
+        frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+
+        # Detectors
+        eye_state = eye_det.process(frame_rgb, frame_bgr.shape)
+        phone_state = phone_det.process(frame_bgr)
+        emo_state = emo_det.process(frame_bgr)
+
+        if "distraction_score" not in phone_state:
+            phone_state["distraction_score"] = 0.0
+
+        # Risk Engine
+        risk_state = risk_eng.update(
+            drowsiness_score=eye_state.get("drowsiness_score", 0.0),
+            distraction_score=phone_state.get("distraction_score", 0.0),
+            emotion_score=emo_state.get("emotion_score", 0.0),
+        )
+
+        # Alerts
+        new_alerts = alert_sys.evaluate(eye_state, phone_state, emo_state, risk_state)
+        for al in new_alerts:
+            recent_alerts.append(f"[{time.strftime('%H:%M:%S')}] {al}")
+        if len(recent_alerts) > 5:
+            recent_alerts = recent_alerts[-5:]
+
+        # Annotation
+        left_pts, right_pts = eye_det.get_eye_landmarks(frame_rgb, frame_bgr.shape)
+        annotated_rgb = annotate(frame_rgb, eye_state, phone_state, emo_state, risk_state, fps, left_pts, right_pts)
+
+        frame_bgr_draw = cv2.cvtColor(annotated_rgb, cv2.COLOR_RGB2BGR)
+        frame_bgr_draw = phone_det.draw_boxes(frame_bgr_draw)
+        annotated_rgb = cv2.cvtColor(frame_bgr_draw, cv2.COLOR_BGR2RGB)
+
+        # FPS Calculation
+        fps_counter += 1
+        if time.time() - fps_timer >= 1.0:
+            fps = fps_counter / (time.time() - fps_timer)
+            fps_counter = 0
+            fps_timer = time.time()
+
+        # UI Updates
+        frame_placeholder.image(annotated_rgb, use_container_width=True)
         
-    with tabs[2]:
-        st.write("Using 3D-to-2D point mapping via SolvePnP, we estimate the Euler angles (Pitch, Yaw, Roll) to determine where the driver is looking.")
+        # Color Risk
+        r_level = risk_state.get('risk_level', 'SAFE')
+        r_color = "green" if r_level == "LOW" else "orange" if r_level == "MEDIUM" else "red"
+        
+        risk_metric.markdown(f"**Overall Risk**: <span style='color:{r_color}; font-size:20px;'>{r_level}</span>", unsafe_allow_html=True)
+        score_metric.markdown(f"**Risk Score**: {risk_state.get('smooth_score', 0):.1f}")
+        fps_metric.markdown(f"**FPS**: {fps:.0f}")
 
-st.markdown("---")
-st.caption("Developed by Hardik | BYOP Capstone Project")
+        emotion_metric.markdown(f"**Emotion**: {emo_state.get('emotion', 'Unknown')}")
+        phone_metric.markdown(f"**Phone Detected**: {'🛑 YES' if phone_state.get('phone_detected') else '✅ NO'}")
+        drowsy_metric.markdown(f"**Drowsy**: {'🛑 YES' if eye_state.get('is_drowsy') else '✅ NO'}")
+
+        alert_text = "\n".join(recent_alerts) if recent_alerts else "No active alerts."
+        alert_box.code(alert_text, language="text")
+
+    cap.release()
+else:
+    st.info("Click 'Start System' in the sidebar to begin monitoring.")
