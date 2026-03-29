@@ -2,7 +2,7 @@
 
 **VisionGuard** is a real-time Computer Vision solution designed to enhance road safety by monitoring driver attentiveness. It uses advanced facial landmark analysis to detect signs of drowsiness, distraction, and fatigue.
 
-![VisionGuard Demo](https://via.placeholder.com/800x400.png?text=VisionGuard+Driver+Monitoring+System+Demo)
+![VisionGuard Demo](visionguard_demo.png)
 
 ## 🚀 Features
 - **Real-time Drowsiness Detection**: Monitors Eye Aspect Ratio (EAR) and alerts the driver after sustained eye closure.
