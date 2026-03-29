@@ -29,9 +29,9 @@ def stop_camera():
 
 col1, col2 = st.sidebar.columns(2)
 with col1:
-    st.button("Start System", on_click=start_camera, use_container_width=True, type="primary")
+    st.button("Start System", on_click=start_camera)
 with col2:
-    st.button("Stop System", on_click=stop_camera, use_container_width=True)
+    st.button("Stop System", on_click=stop_camera)
 
 # ── Dashboard Layout ──
 video_col, stats_col = st.columns([2, 1])
@@ -124,7 +124,7 @@ if st.session_state.run_camera:
             fps_timer = time.time()
 
         # UI Updates
-        frame_placeholder.image(annotated_rgb, use_container_width=True)
+        frame_placeholder.image(annotated_rgb, use_column_width=True)
         
         # Color Risk
         r_level = risk_state.get('risk_level', 'SAFE')
