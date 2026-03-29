@@ -73,7 +73,7 @@ def get_head_pose(shape, img_w, img_h):
 
     # Convert rotation vector to Euler Angles
     rmat, _ = cv2.Rodrigues(rotation_vector)
-    angles, _, _, _, _, _ = cv2.decomposeProjectionMatrix(np.hstack((rmat, translation_vector)))
+    _, _, _, _, _, _, angles = cv2.decomposeProjectionMatrix(np.hstack((rmat, translation_vector)))
     
     pitch, yaw, roll = angles.flatten()
     
